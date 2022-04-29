@@ -1,0 +1,122 @@
+#include "settings.h"
+#include "cJSON.h"
+#include "esp_log.h"
+#include "utils.h"
+#include <string.h>
+#include <stdio.h>
+#include <sys/unistd.h> // unlink
+
+static const char *TAG = "settings";
+static const char* settings_filename = "/spiffs/settings.json";
+
+void settings_init(struct Settings *settings) {
+    memset(settings, 0, sizeof(*settings));
+}
+
+int settings_read(struct Settings *settings) {
+    int status = -1;
+    ESP_LOGI(TAG, "Opening settings file");
+    FILE* f = fopen(settings_filename, "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Failed to open settings file for reading");
+
+        f = fopen(settings_filename, "w");
+        if (f == NULL) {
+            ESP_LOGE(TAG, "Failed to create settings file");
+        } else {
+            fprintf(f, "{}");
+            fclose(f);
+        }
+    } else {
+        ESP_LOGI(TAG, "Settings file opened for reading");
+        enum { SETTINGS_TEXT_SIZE = 1024 };
+        char* settings_text = (char*)malloc(SETTINGS_TEXT_SIZE);
+        if (settings_text == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate memory!");
+        } else {
+            unsigned int cnt = fread(settings_text, 1, SETTINGS_TEXT_SIZE - 1, f);
+            settings_text[cnt] = '\0';
+            ESP_LOGI(TAG, "Read %u bytes from settings file", cnt);
+            ESP_LOGI(TAG, "Settings text: %s", settings_text);
+
+            cJSON* root = cJSON_Parse(settings_text);
+            if (root && cJSON_IsObject(root)) {
+                cJSON* wifi = cJSON_GetObjectItemCaseSensitive(root, "wifi");
+                if (wifi && cJSON_IsObject(wifi)) {
+                    {
+                        cJSON* ssid = cJSON_GetObjectItemCaseSensitive(wifi, "ssid");
+                        if (cJSON_IsString(ssid)) {
+                            strncpyz(settings->wifi.ssid, ssid->valuestring, sizeof(settings->wifi.ssid));
+                        }
+                    }
+                    {
+                        cJSON* password = cJSON_GetObjectItemCaseSensitive(wifi, "password");
+                        if (cJSON_IsString(password)) {
+                            strncpyz(settings->wifi.password, password->valuestring, sizeof(settings->wifi.password));
+                        }
+                    }
+                }
+                status = 0;
+            } else {
+                ESP_LOGE(TAG, "Failed to parse JSON settings!");
+            }
+            cJSON_Delete(root);
+            free(settings_text);
+        }
+        fclose(f);
+    }
+    return status;
+}
+
+int settings_write(struct Settings *settings) {
+    int status = -1;
+    char *str = NULL;
+
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL)
+        goto end;
+    cJSON *wifi = cJSON_AddObjectToObject(root, "wifi");
+    if (wifi == NULL)
+        goto end;
+    cJSON_AddStringToObject(wifi, "ssid", settings->wifi.ssid);
+    cJSON_AddStringToObject(wifi, "password", settings->wifi.password);
+
+    str = cJSON_Print(root);
+    if (str == NULL) {
+        ESP_LOGE(TAG, "Failed to print settings!");
+        goto end;
+    }
+
+    FILE *f = fopen(settings_filename, "w");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Failed opening %s", settings_filename);
+        goto end;
+    }
+    int count = fwrite(str, strlen(str), 1, f);
+    if (count != 1) {
+        fclose(f);
+        ESP_LOGE(TAG, "Failed to write to settings file");
+        goto end;
+    }
+    fclose(f);
+
+    status = 0;
+end:
+    if (root) {
+        cJSON_Delete(root);
+    }
+    if (str) {
+        free(str);
+    }
+    return status;
+}
+
+void settings_erase(void) {
+    ESP_LOGI(TAG, "Erasing settings file...");
+    int rc = unlink(settings_filename);
+    if (rc != 0) {
+        ESP_LOGI(TAG, "Could not delete file");
+    } else {
+        ESP_LOGI(TAG, "File deleted");
+    }
+}

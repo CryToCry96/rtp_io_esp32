@@ -1,0 +1,18 @@
+#ifndef SETTINGS_H
+#define SETTINGS_H
+
+struct Settings {
+
+    struct Wifi {
+        char ssid[64];
+        char password[64];
+    } wifi;
+
+};
+
+void settings_init(struct Settings *settings);
+int settings_read(struct Settings *settings);
+int settings_write(struct Settings *settings);
+void settings_erase(void);
+
+#endif
