@@ -40,4 +40,4 @@ script:
 
 branches:
   only:
-  - master
+  - main
