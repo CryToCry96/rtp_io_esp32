@@ -10,4 +10,5 @@ idf_component_register(SRCS
                         "modbus_tcp/modbus_params.c"
                         "modbus_tcp/tcp_slave.c"
                         "di_do.c"
+                        "wifi_run.c"
                         INCLUDE_DIRS "include")

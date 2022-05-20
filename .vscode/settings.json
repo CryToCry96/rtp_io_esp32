@@ -2,6 +2,7 @@
   "C_Cpp.intelliSenseEngine": "Tag Parser",
   "idf.adapterTargetName": "esp32",
   "files.associations": {
-    "esp_log.h": "c"
+    "esp_log.h": "c",
+    "*.inc": "c"
   }
 }
